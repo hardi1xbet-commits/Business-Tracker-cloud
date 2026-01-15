@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BizTracker Cloud 2026</title>
+  <title>Business Tracker 2026 - Cloud</title>
   
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -14,11 +14,11 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-slate-900 font-sans text-slate-100">
+<body>
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useRef } = React;
 
     // --- FIREBASE CONFIGURATION ---
     const firebaseConfig = {
@@ -30,218 +30,318 @@
         appId: "1:1003923087420:web:74acc7dd1b760b0ba96339"
     };
 
-    // Initialize Firebase only once
+    // Initialize Firebase
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    const App = () => {
-      const [user, setUser] = useState(null);
+    const BusinessTracker2026 = () => {
+      // STATE VARIABLES
       const [data, setData] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [status, setStatus] = useState('');
+      const [saveMessage, setSaveMessage] = useState('');
+      const [user, setUser] = useState(null);
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
+      const [isSignUp, setIsSignUp] = useState(false);
+      const [syncStatus, setSyncStatus] = useState('');
+      const [isLoading, setIsLoading] = useState(true);
+      const fileInputRef = useRef(null);
 
-      // --- DASHBOARD CALCULATIONS ---
-      const stats = useMemo(() => {
-        let totalIn = 0;
-        let totalOut = 0;
-        data.forEach(m => {
-          m.weeks.forEach(w => {
-            totalIn += parseFloat(w.deposit || 0);
-            totalOut += parseFloat(w.out || 0);
-          });
-        });
-        return { totalIn, totalOut, balance: totalIn - totalOut };
-      }, [data]);
-
-      // --- INITIAL DATA GENERATOR ---
+      // --- ORIGINAL DATE LOGIC RESTORED ---
       const generateWeeks = () => {
         const weeks = [];
-        let weekNum = 1;
-        const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-        months.forEach(m => {
+        let weekNumber = 1;
+        
+        for (let month = 1; month <= 12; month++) {
+          const monthName = new Date(2026, month - 1).toLocaleString('default', { month: 'long' });
+          const daysInMonth = new Date(2026, month, 0).getDate();
+          const firstDay = new Date(2026, month - 1, 1);
+          const lastDay = new Date(2026, month - 1, daysInMonth);
+          
+          let currentDate = new Date(firstDay);
           let monthWeeks = [];
-          for(let i=0; i<4; i++) {
-            monthWeeks.push({ weekNum: weekNum++, month: m, deposit: '', out: '' });
+          
+          while (currentDate <= lastDay) {
+            const weekStart = new Date(currentDate);
+            const weekEnd = new Date(currentDate);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            
+            if (weekEnd > lastDay) {
+              weekEnd.setTime(lastDay.getTime());
+            }
+            
+            monthWeeks.push({
+              weekNum: weekNumber++,
+              month: monthName,
+              dateRange: `${weekStart.getDate().toString().padStart(2, '0')}/${(weekStart.getMonth() + 1).toString().padStart(2, '0')} - ${weekEnd.getDate().toString().padStart(2, '0')}/${(weekEnd.getMonth() + 1).toString().padStart(2, '0')}`,
+              deposit: '',
+              out: ''
+            });
+            
+            currentDate.setDate(currentDate.getDate() + 7);
           }
-          weeks.push({ month: m, weeks: monthWeeks });
-        });
+          
+          weeks.push({ month: monthName, weeks: monthWeeks });
+        }
         return weeks;
       };
 
-      // --- AUTH LISTENER ---
+      // --- FIREBASE AUTH LISTENER ---
       useEffect(() => {
         return auth.onAuthStateChanged(u => {
           setUser(u);
-          if (u) loadData(u.uid);
-          else setLoading(false);
+          if (u) {
+            loadDataFromCloud(u.uid);
+          } else {
+            setIsLoading(false);
+            setData(generateWeeks()); // Reset to default if logged out
+          }
         });
       }, []);
 
       // --- CLOUD FUNCTIONS ---
-      const loadData = async (uid) => {
-        setStatus('☁️ Syncing...');
+      const loadDataFromCloud = async (uid) => {
+        setSyncStatus('☁️ Loading from cloud...');
         try {
-            const doc = await db.collection('users').doc(uid).get();
-            if (doc.exists) setData(doc.data().businessData);
-            else setData(generateWeeks());
-            setStatus('✅ Connected');
+          const doc = await db.collection('users').doc(uid).get();
+          if (doc.exists) {
+            setData(doc.data().businessData);
+            setSyncStatus('✅ Synced from cloud');
+          } else {
+            setData(generateWeeks());
+            setSyncStatus('📝 New Cloud Account');
+          }
         } catch (error) {
-            console.error(error);
-            setStatus('⚠️ Cloud Error (Check Console)');
+          console.error("Load Error", error);
+          setSyncStatus('❌ Offline Mode');
         }
-        setLoading(false);
-        setTimeout(() => setStatus(''), 4000);
+        setIsLoading(false);
+        setTimeout(() => setSyncStatus(''), 3000);
       };
 
-      const handleAuth = async (isSignUp) => {
-        // THIS FIXES THE "BADLY FORMATTED EMAIL" ERROR
-        const cleanEmail = email.trim(); 
+      const handleSaveToCloud = async () => {
+        if (!user) return;
+        setSyncStatus('☁️ Syncing to cloud...');
+        
+        try {
+          await db.collection('users').doc(user.uid).set({
+            businessData: data,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          setSaveMessage('✅ Data saved and synced to cloud!');
+          setSyncStatus('✅ Synced');
+        } catch (error) {
+          console.error('Save error:', error);
+          setSaveMessage('❌ Save failed. Check internet.');
+        }
+        setTimeout(() => { setSyncStatus(''); setSaveMessage(''); }, 3000);
+      };
+
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        const cleanEmail = email.trim(); // THE FIX FOR "BADLY FORMATTED EMAIL"
         const cleanPass = password.trim();
 
-        if(!cleanEmail || !cleanPass) return alert("Please fill in email and password");
+        if (!cleanEmail || !cleanPass) return;
 
         try {
-          setStatus('🔐 Verifying...');
-          if (isSignUp) await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
-          else await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
-        } catch (e) { 
-          alert("Login Error: " + e.message);
-          setStatus('❌ Error');
+          if (isSignUp) {
+            await auth.createUserWithEmailAndPassword(cleanEmail, cleanPass);
+            setSaveMessage('🚀 Account Created!');
+          } else {
+            await auth.signInWithEmailAndPassword(cleanEmail, cleanPass);
+            setSaveMessage('✅ Logged in successfully!');
+          }
+        } catch (error) {
+          setSaveMessage("❌ Error: " + error.message);
         }
+        setTimeout(() => setSaveMessage(''), 3000);
       };
 
-      const saveToCloud = async () => {
-        setStatus('⏳ Saving...');
-        try {
-            await db.collection('users').doc(user.uid).set({ 
-                businessData: data,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            setStatus('✅ Saved!');
-        } catch (e) { 
-            setStatus('❌ Save Failed: ' + e.message); 
-        }
-        setTimeout(() => setStatus(''), 3000);
+      const handleLogout = () => {
+        auth.signOut();
+        setEmail('');
+        setPassword('');
       };
 
-      const downloadBackup = () => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `BizTracker_Backup_${new Date().toISOString().slice(0,10)}.json`;
-        a.click();
-      };
-
-      const updateVal = (mIdx, wIdx, field, val) => {
-        const newData = JSON.parse(JSON.stringify(data));
-        newData[mIdx].weeks[wIdx][field] = val;
+      // --- DATA HANDLING ---
+      const handleInputChange = (monthIndex, weekIndex, field, value) => {
+        const newData = [...data];
+        newData[monthIndex].weeks[weekIndex][field] = value;
         setData(newData);
       };
 
-      // --- RENDER ---
-      if (loading) return <div className="flex h-screen items-center justify-center font-bold animate-pulse text-indigo-400">CONNECTING TO CLOUD...</div>;
+      const calculateNet = (deposit, out) => {
+        const dep = parseFloat(deposit) || 0;
+        const exp = parseFloat(out) || 0;
+        return dep - exp;
+      };
 
-      if (!user) return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
-          <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
-            <h1 className="text-3xl font-bold text-center mb-2 text-indigo-500">BizTracker ☁️</h1>
-            <p className="text-center text-slate-400 mb-6 text-sm">Secure Cloud Login</p>
-            
-            <div className="space-y-4">
-              <input type="email" placeholder="Enter Email" className="w-full bg-slate-700 border border-slate-600 p-3 rounded-xl focus:border-indigo-500 outline-none text-white placeholder-slate-400 transition" onChange={e => setEmail(e.target.value)} />
-              <input type="password" placeholder="Enter Password" className="w-full bg-slate-700 border border-slate-600 p-3 rounded-xl focus:border-indigo-500 outline-none text-white placeholder-slate-400 transition" onChange={e => setPassword(e.target.value)} />
+      const calculateMonthTotal = (monthWeeks) => {
+        return monthWeeks.reduce((sum, week) => {
+          return sum + calculateNet(week.deposit, week.out);
+        }, 0);
+      };
+
+      const calculateYearTotal = () => {
+        return data.reduce((sum, month) => {
+          return sum + calculateMonthTotal(month.weeks);
+        }, 0);
+      };
+
+      const exportCSV = () => {
+        try {
+          let csv = 'Week,Month,Date Range,Deposit (R),Out (R),Net (R)\n';
+          data.forEach(month => {
+            month.weeks.forEach(week => {
+              const net = calculateNet(week.deposit, week.out);
+              csv += `${week.weekNum},${week.month},"${week.dateRange}",${week.deposit || 0},${week.out || 0},${net.toFixed(2)}\n`;
+            });
+          });
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `business_tracker_${user.email}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setSaveMessage('✅ CSV exported successfully!');
+          setTimeout(() => setSaveMessage(''), 3000);
+        } catch (error) {
+          setSaveMessage('❌ Export failed.');
+        }
+      };
+
+      // --- RENDER UI (ORIGINAL DESIGN) ---
+      if (!user) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-700 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <span className="text-3xl">☁️</span>
+                </div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Business Tracker Cloud</h1>
+                <p className="text-gray-600">Sign in to sync your data across devices</p>
+              </div>
               
-              <button onClick={() => handleAuth(false)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">Login</button>
-              <button onClick={() => handleAuth(true)} className="w-full border border-indigo-500 text-indigo-400 font-bold py-3 rounded-xl hover:bg-indigo-500/10 transition">Create Account</button>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="your@email.com" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="••••••••" required />
+                </div>
+                <button type="submit" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition duration-200 shadow-lg hover:shadow-xl">
+                  {isSignUp ? '🚀 Sign Up' : '🔓 Sign In'}
+                </button>
+              </form>
+              
+              <div className="mt-6 text-center">
+                <button onClick={() => setIsSignUp(!isSignUp)} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                </button>
+              </div>
+              {saveMessage && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-center text-sm font-semibold">{saveMessage}</div>}
             </div>
           </div>
-        </div>
-      );
+        );
+      }
+
+      if (isLoading) return <div className="min-h-screen bg-indigo-900 flex items-center justify-center text-white font-bold animate-pulse">LOADING CLOUD DATA...</div>;
 
       return (
-        <div className="p-4 max-w-5xl mx-auto pb-20">
-          {/* DASHBOARD */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-3xl shadow-xl text-white">
-              <p className="text-xs uppercase font-bold opacity-75 tracking-wider">Balance Available</p>
-              <h2 className="text-4xl font-black mt-1 tracking-tight">R{stats.balance.toLocaleString()}</h2>
-            </div>
-            <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg">
-              <p className="text-xs uppercase font-bold text-emerald-400">Total Income</p>
-              <h2 className="text-2xl font-bold text-emerald-400 mt-1">+ R{stats.totalIn.toLocaleString()}</h2>
-            </div>
-            <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg">
-              <p className="text-xs uppercase font-bold text-rose-400">Total Expenses</p>
-              <h2 className="text-2xl font-bold text-rose-400 mt-1">- R{stats.totalOut.toLocaleString()}</h2>
-            </div>
-          </div>
-
-          {/* CONTROLS */}
-          <div className="flex flex-wrap justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700 shadow-md">
-            <div className="flex items-center gap-3">
-              <div className={`h-3 w-3 rounded-full ${status.includes('Error') ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
-              <div>
-                <p className="font-bold text-sm text-slate-200">Cloud Active</p>
-                <p className="text-[10px] text-slate-500 uppercase">{user.email}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={saveToCloud} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg transition">☁️ SYNC</button>
-              <button onClick={downloadBackup} className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition">💾 BACKUP</button>
-              <button onClick={() => auth.signOut()} className="bg-rose-900/30 text-rose-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-rose-900/50 transition">LOGOUT</button>
-            </div>
-          </div>
-
-          {/* DATA TABLE */}
-          <div className="space-y-6">
-            {data.map((m, mIdx) => (
-              <div key={mIdx} className="bg-white rounded-3xl overflow-hidden shadow-xl text-slate-900">
-                <div className="bg-slate-100 px-6 py-4 border-b border-slate-200">
-                  <h3 className="font-black text-slate-700 uppercase tracking-wider">{m.month}</h3>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-700 p-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+              <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-3xl font-bold text-gray-800">2026 Business Tracker</h1>
+                    <span className="text-2xl">☁️</span>
+                  </div>
+                  <p className="text-gray-600 mt-1">
+                    Logged in as: <span className="font-semibold">{user.email}</span>
+                    {syncStatus && <span className="ml-2 text-sm text-indigo-600">{syncStatus}</span>}
+                  </p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50 text-slate-500">
-                        <th className="px-6 py-3 text-left font-bold uppercase text-[10px]">Week</th>
-                        <th className="px-6 py-3 text-left font-bold uppercase text-[10px]">Deposit (R)</th>
-                        <th className="px-6 py-3 text-left font-bold uppercase text-[10px]">Out (R)</th>
-                        <th className="px-6 py-3 text-left font-bold uppercase text-[10px]">Net</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {m.weeks.map((w, wIdx) => {
-                        const net = (parseFloat(w.deposit) || 0) - (parseFloat(w.out) || 0);
-                        return (
-                          <tr key={wIdx} className="hover:bg-indigo-50 transition">
-                            <td className="px-6 py-4 font-bold text-slate-400">{w.weekNum}</td>
-                            <td className="px-6 py-4">
-                              <input type="number" className="w-full border-b-2 border-transparent focus:border-indigo-500 bg-transparent outline-none py-1 font-semibold text-slate-700" value={w.deposit} onChange={e => updateVal(mIdx, wIdx, 'deposit', e.target.value)} placeholder="0" />
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={handleSaveToCloud} className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-2 rounded-lg font-semibold transition duration-200 shadow-md hover:shadow-lg">
+                    ☁️ Save to Cloud
+                  </button>
+                  <button onClick={exportCSV} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition duration-200 shadow-md hover:shadow-lg">
+                    📥 Export CSV
+                  </button>
+                  <button onClick={handleLogout} className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-6 py-2 rounded-lg font-semibold transition duration-200 shadow-md hover:shadow-lg">
+                    🚪 Logout
+                  </button>
+                </div>
+              </div>
+              
+              {saveMessage && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 text-green-700 rounded text-center font-semibold shadow-sm">
+                  {saveMessage}
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-indigo-100 via-purple-100 to-blue-100">
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Week</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Month</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Date Range</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Deposit (R)</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Out (R)</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Net (R)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.map((month, monthIndex) => (
+                      <React.Fragment key={monthIndex}>
+                        {month.weeks.map((week, weekIndex) => (
+                          <tr key={weekIndex} className="hover:bg-indigo-50 transition">
+                            <td className="border border-gray-300 px-4 py-2 font-medium">{week.weekNum}</td>
+                            <td className="border border-gray-300 px-4 py-2">{week.month}</td>
+                            <td className="border border-gray-300 px-4 py-2 text-sm">{week.dateRange}</td>
+                            <td className="border border-gray-300 px-4 py-2">
+                              <input type="number" value={week.deposit} onChange={(e) => handleInputChange(monthIndex, weekIndex, 'deposit', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="0" />
                             </td>
-                            <td className="px-6 py-4">
-                              <input type="number" className="w-full border-b-2 border-transparent focus:border-rose-500 bg-transparent outline-none py-1 font-semibold text-slate-700" value={w.out} onChange={e => updateVal(mIdx, wIdx, 'out', e.target.value)} placeholder="0" />
+                            <td className="border border-gray-300 px-4 py-2">
+                              <input type="number" value={week.out} onChange={(e) => handleInputChange(monthIndex, weekIndex, 'out', e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="0" />
                             </td>
-                            <td className={`px-6 py-4 font-bold ${net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              R{net.toLocaleString()}
+                            <td className={`border border-gray-300 px-4 py-2 font-semibold ${calculateNet(week.deposit, week.out) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              R{calculateNet(week.deposit, week.out).toFixed(2)}
                             </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        ))}
+                        <tr className="bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 font-bold">
+                          <td colSpan="5" className="border border-gray-300 px-4 py-3 text-right text-gray-700">{month.month} Total:</td>
+                          <td className={`border border-gray-300 px-4 py-3 font-bold text-lg ${calculateMonthTotal(month.weeks) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            R{calculateMonthTotal(month.weeks).toFixed(2)}
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    ))}
+                    <tr className="bg-gradient-to-r from-purple-100 via-indigo-100 to-blue-100 font-bold text-lg">
+                      <td colSpan="5" className="border border-gray-300 px-4 py-4 text-right text-gray-800">🎯 2026 Year Total:</td>
+                      <td className={`border border-gray-300 px-4 py-4 font-bold text-xl ${calculateYearTotal() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        R{calculateYearTotal().toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       );
     };
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+    ReactDOM.render(<BusinessTracker2026 />, document.getElementById('root'));
   </script>
 </body>
 </html>
