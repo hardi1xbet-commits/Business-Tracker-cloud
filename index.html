@@ -1,214 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Tracker 2026 - Firebase Live</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
-    <style>
-        .loading-spinner { border-top-color: #4F46E5; animation: spinner 0.6s linear infinite; }
-        @keyframes spinner { to { transform: rotate(360deg); } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Tracker 2026 - Pro Cloud</title>
+  
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-slate-900">
+  <div id="root"></div>
 
-    <div id="status-bar" class="bg-gray-800 text-white text-xs py-1 px-4 flex justify-between">
-        <span id="auth-status">Checking connection...</span>
-        <span id="sync-status">Cloud Sync: Ready</span>
-    </div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
 
-    <div id="app" class="max-w-md mx-auto p-6">
-        <div id="auth-container" class="bg-white p-8 rounded-xl shadow-lg mt-10">
-            <h2 class="text-2xl font-bold mb-6 text-center text-indigo-600">Business Tracker Login</h2>
-            <div class="space-y-4">
-                <input type="email" id="email" placeholder="Email" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                <input type="password" id="password" placeholder="Password" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                <button onclick="handleLogin()" class="w-full bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition">Login</button>
-                <button onclick="handleSignUp()" class="w-full border border-indigo-600 text-indigo-600 p-3 rounded-lg font-semibold hover:bg-indigo-50 transition">Create Account</button>
-            </div>
-            <p id="auth-error" class="text-red-500 mt-4 text-sm text-center hidden"></p>
-        </div>
+    // --- YOUR FIREBASE CONFIG ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyDuUdMjo4ZiR-DuW7eeCK8EDBcjWsodR4M",
+        authDomain: "business-tracker-3386c.firebaseapp.com",
+        projectId: "business-tracker-3386c",
+        storageBucket: "business-tracker-3386c.firebasestorage.app",
+        messagingSenderId: "1003923087420",
+        appId: "1:1003923087420:web:74acc7dd1b760b0ba96339"
+    };
 
-        <div id="dashboard" class="hidden py-6">
-            <div class="flex justify-between items-center mb-6">
-                <h1 class="text-2xl font-bold text-gray-800">My Business</h1>
-                <button onclick="handleLogout()" class="text-sm text-red-500 font-medium">Logout</button>
-            </div>
-            
-            <div class="bg-indigo-600 rounded-2xl p-6 text-white shadow-xl mb-6">
-                <p class="opacity-80">Total Balance</p>
-                <h2 id="total-balance" class="text-4xl font-bold">$0.00</h2>
-            </div>
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
-                    <p class="text-gray-500 text-sm">Income</p>
-                    <p id="total-income" class="text-xl font-bold text-green-600">$0.00</p>
-                </div>
-                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-red-500">
-                    <p class="text-gray-500 text-sm">Expenses</p>
-                    <p id="total-expense" class="text-xl font-bold text-red-600">$0.00</p>
-                </div>
-            </div>
+    const App = () => {
+      const [user, setUser] = useState(null);
+      const [data, setData] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [status, setStatus] = useState('');
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
 
-            <div class="bg-white rounded-xl shadow-md p-4 mb-6">
-                <h3 class="font-bold mb-4">Add Transaction</h3>
-                <div class="space-y-3">
-                    <input type="text" id="desc" placeholder="Description" class="w-full p-2 border rounded">
-                    <input type="number" id="amount" placeholder="Amount" class="w-full p-2 border rounded">
-                    <select id="type" class="w-full p-2 border rounded">
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                    </select>
-                    <button onclick="addTransaction()" id="add-btn" class="w-full bg-indigo-600 text-white py-2 rounded font-bold">Add to Cloud</button>
-                </div>
-            </div>
-
-            <div id="transaction-list" class="space-y-3">
-                </div>
-        </div>
-    </div>
-
-    <script>
-        // --- FIREBASE CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyDuUdMjo4ZiR-DuW7eeCK8EDBcjWsodR4M",
-            authDomain: "business-tracker-3386c.firebaseapp.com",
-            projectId: "business-tracker-3386c",
-            storageBucket: "business-tracker-3386c.firebasestorage.app",
-            messagingSenderId: "1003923087420",
-            appId: "1:1003923087420:web:74acc7dd1b760b0ba96339"
-        };
-
-        // Initialize
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUser = null;
-
-        // --- AUTH LOGIC ---
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                showDashboard();
-                loadData();
-                document.getElementById('auth-status').innerText = `Logged in: ${user.email}`;
-            } else {
-                showLogin();
-                document.getElementById('auth-status').innerText = "Logged out";
-            }
+      // Auto-generate weeks for a new user
+      const generateWeeks = () => {
+        const weeks = [];
+        let weekNum = 1;
+        const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        months.forEach(m => {
+          let monthWeeks = [];
+          for(let i=0; i<4; i++) {
+            monthWeeks.push({ weekNum: weekNum++, month: m, deposit: '', out: '' });
+          }
+          weeks.push({ month: m, weeks: monthWeeks });
         });
+        return weeks;
+      };
 
-        async function handleSignUp() {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            try {
-                await auth.createUserWithEmailAndPassword(email, pass);
-            } catch (err) {
-                showError(err.message);
-            }
-        }
+      useEffect(() => {
+        return auth.onAuthStateChanged(u => {
+          setUser(u);
+          if (u) loadData(u.uid);
+          else setLoading(false);
+        });
+      }, []);
 
-        async function handleLogin() {
-            const email = document.getElementById('email').value;
-            const pass = document.getElementById('password').value;
-            try {
-                await auth.signInWithEmailAndPassword(email, pass);
-            } catch (err) {
-                showError(err.message);
-            }
-        }
+      const loadData = async (uid) => {
+        setStatus('☁️ Fetching data...');
+        const doc = await db.collection('users').doc(uid).get();
+        if (doc.exists) setData(doc.data().businessData);
+        else setData(generateWeeks());
+        setLoading(false);
+        setStatus('✅ Cloud Connected');
+        setTimeout(() => setStatus(''), 3000);
+      };
 
-        function handleLogout() {
-            auth.signOut();
-        }
+      const handleAuth = async (isSignUp) => {
+        try {
+          if (isSignUp) await auth.createUserWithEmailAndPassword(email, password);
+          else await auth.signInWithEmailAndPassword(email, password);
+        } catch (e) { alert(e.message); }
+      };
 
-        // --- DATA LOGIC ---
-        async function addTransaction() {
-            const desc = document.getElementById('desc').value;
-            const amount = parseFloat(document.getElementById('amount').value);
-            const type = document.getElementById('type').value;
+      const saveToCloud = async () => {
+        setStatus('⏳ Syncing...');
+        await db.collection('users').doc(user.uid).set({ businessData: data });
+        setStatus('✅ Saved to Cloud!');
+        setTimeout(() => setStatus(''), 3000);
+      };
 
-            if (!desc || isNaN(amount)) return;
+      const downloadBackup = () => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `biz_tracker_backup_${new Date().toLocaleDateString()}.json`;
+        a.click();
+      };
 
-            document.getElementById('add-btn').innerText = "Syncing...";
-            
-            try {
-                await db.collection('users').doc(currentUser.uid).collection('transactions').add({
-                    desc,
-                    amount,
-                    type,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                document.getElementById('desc').value = '';
-                document.getElementById('amount').value = '';
-                document.getElementById('add-btn').innerText = "Add to Cloud";
-            } catch (err) {
-                alert("Error saving: " + err.message);
-            }
-        }
+      const updateVal = (mIdx, wIdx, field, val) => {
+        const newData = [...data];
+        newData[mIdx].weeks[wIdx][field] = val;
+        setData(newData);
+      };
 
-        function loadData() {
-            db.collection('users').doc(currentUser.uid).collection('transactions')
-                .orderBy('timestamp', 'desc')
-                .onSnapshot(snapshot => {
-                    let transactions = [];
-                    let income = 0;
-                    let expense = 0;
+      if (loading) return <div className="text-white text-center mt-20">Loading Cloud...</div>;
 
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        transactions.push({ id: doc.id, ...data });
-                        if (data.type === 'income') income += data.amount;
-                        else expense += data.amount;
-                    });
+      if (!user) return (
+        <div className="flex flex-col items-center justify-center min-h-screen text-white p-6">
+          <div className="bg-white text-slate-900 p-8 rounded-2xl shadow-xl w-full max-w-sm text-center">
+            <h1 className="text-2xl font-bold mb-4">BizTracker ☁️</h1>
+            <input type="email" placeholder="Email" className="w-full border p-2 mb-2 rounded" onChange={e => setEmail(e.target.value)} />
+            <input type="password" placeholder="Password" className="w-full border p-2 mb-4 rounded" onChange={e => setPassword(e.target.value)} />
+            <button onClick={() => handleAuth(false)} className="w-full bg-indigo-600 text-white py-2 rounded mb-2">Login</button>
+            <button onClick={() => handleAuth(true)} className="w-full border border-indigo-600 py-2 rounded">Create Account</button>
+          </div>
+        </div>
+      );
 
-                    renderUI(transactions, income, expense);
-                });
-        }
+      return (
+        <div className="p-4 max-w-5xl mx-auto text-white">
+          <div className="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-xl">
+            <div>
+              <h2 className="text-xl font-bold">Business Tracker 2026</h2>
+              <p className="text-xs text-indigo-400">{user.email} | {status}</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveToCloud} className="bg-green-600 px-3 py-1 rounded text-sm">Save Cloud</button>
+              <button onClick={downloadBackup} className="bg-blue-600 px-3 py-1 rounded text-sm">💾 Backup</button>
+              <button onClick={() => auth.signOut()} className="bg-red-600 px-3 py-1 rounded text-sm">Logout</button>
+            </div>
+          </div>
 
-        // --- UI HELPERS ---
-        function renderUI(list, inc, exp) {
-            document.getElementById('total-balance').innerText = `$${(inc - exp).toFixed(2)}`;
-            document.getElementById('total-income').innerText = `$${inc.toFixed(2)}`;
-            document.getElementById('total-expense').innerText = `$${exp.toFixed(2)}`;
+          <div className="space-y-4">
+            {data.map((m, mIdx) => (
+              <div key={mIdx} className="bg-white text-slate-900 rounded-lg overflow-hidden shadow-lg">
+                <div className="bg-indigo-100 px-4 py-2 font-bold border-b">{m.month}</div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b">
+                      <th className="p-2 text-left">Week</th>
+                      <th className="p-2 text-left">Deposit (R)</th>
+                      <th className="p-2 text-left">Out (R)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.weeks.map((w, wIdx) => (
+                      <tr key={wIdx} className="border-b">
+                        <td className="p-2 font-medium">{w.weekNum}</td>
+                        <td className="p-2"><input type="number" className="w-full border rounded px-1" value={w.deposit} onChange={e => updateVal(mIdx, wIdx, 'deposit', e.target.value)} /></td>
+                        <td className="p-2"><input type="number" className="w-full border rounded px-1" value={w.out} onChange={e => updateVal(mIdx, wIdx, 'out', e.target.value)} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
 
-            const listEl = document.getElementById('transaction-list');
-            listEl.innerHTML = list.map(t => `
-                <div class="bg-white p-4 rounded-lg shadow-sm flex justify-between items-center border-r-4 ${t.type === 'income' ? 'border-green-500' : 'border-red-500'}">
-                    <div>
-                        <p class="font-bold text-gray-800">${t.desc}</p>
-                        <p class="text-xs text-gray-400">${t.timestamp?.toDate().toLocaleDateString() || 'Just now'}</p>
-                    </div>
-                    <p class="font-bold ${t.type === 'income' ? 'text-green-600' : 'text-red-600'}">
-                        ${t.type === 'income' ? '+' : '-'}$${t.amount.toFixed(2)}
-                    </p>
-                </div>
-            `).join('');
-        }
-
-        function showDashboard() {
-            document.getElementById('auth-container').classList.add('hidden');
-            document.getElementById('dashboard').classList.remove('hidden');
-        }
-
-        function showLogin() {
-            document.getElementById('auth-container').classList.remove('hidden');
-            document.getElementById('dashboard').classList.add('hidden');
-        }
-
-        function showError(msg) {
-            const errEl = document.getElementById('auth-error');
-            errEl.innerText = msg;
-            errEl.classList.remove('hidden');
-        }
-    </script>
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
 </body>
 </html>
