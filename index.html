@@ -6,14 +6,8 @@
   <title>Business Tracker 2026 - Cloud</title>
   
   <meta name="theme-color" content="#4F46E5">
-  <meta name="description" content="Business Financial Tracker 2026 - Cloud Synced">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="BizTracker Cloud">
-  
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%234F46E5' width='100' height='100'/><text y='55' x='50' text-anchor='middle' font-size='50' fill='white' font-family='Arial'>☁️</text><text y='80' x='50' text-anchor='middle' font-size='20' fill='white' font-family='Arial'>BT</text></svg>">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%234F46E5' width='100' height='100'/><text y='55' x='50' text-anchor='middle' font-size='50' fill='white' font-family='Arial'>☁️</text><text y='80' x='50' text-anchor='middle' font-size='20' fill='white' font-family='Arial'>BT</text></svg>">
-  <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQnVzaW5lc3MgVHJhY2tlciAyMDI2IC0gQ2xvdWQiLCJzaG9ydF9uYW1lIjoiQml6VHJhY2tlciIsImRlc2NyaXB0aW9uIjoiVHJhY2sgeW91ciBidXNpbmVzcyBmaW5hbmNlcyB3aXRoIGNsb3VkIHN5bmMiLCJzdGFydF91cmwiOiIuLyIsInNjb3BlIjoiLi8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZmZmZmZmIiwidGhlbWVfY29sb3IiOiIjNEY0NkU1Iiwib3JpZW50YXRpb24iOiJwb3J0cmFpdCIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWwsPHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAxMDAgMTAwJz48cmVjdCBmaWxsPSclMjM0RjQ2RTUnIHdpZHRoPScxMDAnIGhlaWdodD0nMTAwJy8+PHRleHQgeT0nNTUnIHg9JzUwJyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmb250LXNpemU9JzUwJyBmaWxsPSd3aGl0ZScgZm9udC1mYW1pbHk9J0FyaWFsJz7imIHvuI88L3RleHQ+PHRleHQgeT0nODAnIHg9JzUwJyB0ZXh0LWFuY2hvcj0nbWlkZGxlJyBmb250LXNpemU9JzIwJyBmaWxsPSd3aGl0ZScgZm9udC1mYW1pbHk9J0FyaWFsJz5CVDwvdGV4dD48L3N2Zz4iLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2Uvc3ZnK3htbCIsInB1cnBvc2UiOiJhbnkgbWFza2FibGUifSx7InNyYyI6ImRhdGE6aW1hZ2Uvc3ZnK3htbCw8c3ZnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zycgdmlld0JveD0nMCAwIDEwMCAxMDAnPjxyZWN0IGZpbGw9JyUyMzRGNDZFNScgd2lkdGg9JzEwMCcgaGVpZ2h0PScxMDAnLz48dGV4dCB5PSc1NScgeD0nNTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZvbnQtc2l6ZT0nNTAnIGZpbGw9J3doaXRlJyBmb250LWZhbWlseT0nQXJpYWwnPuKYge+4jzwvdGV4dD48dGV4dCB5PSc4MCcgeD0nNTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZvbnQtc2l6ZT0nMjAnIGZpbGw9J3doaXRlJyBmb250LWZhbWlseT0nQXJpYWwnPkJUPC90ZXh0Pjwvc3ZnPiIsInNpemVzIjoiNTEyeDUxMiIsInR5cGUiOiJpbWFnZS9zdmcreG1sIiwicHVycG9zZSI6ImFueSBtYXNrYWJsZSJ9XX0=">
 
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -112,7 +106,24 @@
         setTimeout(() => setSyncStatus(''), 3000);
       };
 
-      // --- IMPORT CSV LOGIC (RESTORED) ---
+      // --- RESET PASSWORD FUNCTION ---
+      const handleResetPassword = async () => {
+        const cleanEmail = email.trim();
+        if (!cleanEmail) {
+          setSaveMessage('⚠️ Please enter your email address first!');
+          setTimeout(() => setSaveMessage(''), 3000);
+          return;
+        }
+        try {
+          await auth.sendPasswordResetEmail(cleanEmail);
+          setSaveMessage('📧 Password reset email sent! Check your inbox.');
+        } catch (error) {
+          setSaveMessage('❌ Error: ' + error.message);
+        }
+        setTimeout(() => setSaveMessage(''), 5000);
+      };
+
+      // --- IMPORT CSV LOGIC ---
       const handleImportClick = () => {
         fileInputRef.current.click();
       };
@@ -126,7 +137,7 @@
           try {
             const csvText = event.target.result;
             const lines = csvText.split('\n');
-            const newData = generateWeeks(); // Reset structure
+            const newData = generateWeeks(); 
             
             for (let i = 1; i < lines.length; i++) {
               const line = lines[i].trim();
@@ -138,7 +149,6 @@
               const deposit = parts[3] || '';
               const out = parts[4] || '';
               
-              // Find matching week
               for (let m = 0; m < newData.length; m++) {
                 for (let w = 0; w < newData[m].weeks.length; w++) {
                   if (newData[m].weeks[w].weekNum === weekNum) {
@@ -149,7 +159,6 @@
               }
             }
             setData(newData);
-            // Auto save after import
             if (user) {
                 await db.collection('users').doc(user.uid).set({
                     businessData: newData,
@@ -163,7 +172,7 @@
           } catch (error) {
             setSaveMessage('❌ Import Failed');
           }
-          e.target.value = ''; // Reset input
+          e.target.value = '';
         };
         reader.readAsText(file);
       };
@@ -245,6 +254,7 @@
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">Business Tracker Cloud</h1>
                 <p className="text-gray-600">Sign in to sync your data across devices</p>
               </div>
+              
               <form onSubmit={handleLogin} className="space-y-4">
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Email" required />
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Password" required />
@@ -252,12 +262,18 @@
                   {isSignUp ? '🚀 Sign Up' : '🔓 Sign In'}
                 </button>
               </form>
-              <div className="mt-6 text-center">
+              
+              {/* PASSWORD RESET LINK */}
+              <div className="flex justify-between items-center mt-4">
+                 <button onClick={handleResetPassword} className="text-indigo-600 hover:text-indigo-800 text-sm underline">
+                  Forgot Password?
+                </button>
                 <button onClick={() => setIsSignUp(!isSignUp)} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
-                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                  {isSignUp ? 'Already have an account?' : "Don't have an account?"}
                 </button>
               </div>
-              {saveMessage && <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-center text-sm font-semibold">{saveMessage}</div>}
+
+              {saveMessage && <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-center text-sm font-semibold">{saveMessage}</div>}
             </div>
           </div>
         );
@@ -285,7 +301,6 @@
                 </div>
               </div>
               
-              {/* HIDDEN FILE INPUT FOR IMPORT */}
               <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".csv" style={{display: 'none'}} />
 
               {saveMessage && <div className="mb-4 p-4 bg-green-50 text-green-700 rounded text-center font-semibold border-l-4 border-green-500 shadow-sm">{saveMessage}</div>}
